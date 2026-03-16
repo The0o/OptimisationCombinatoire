@@ -13,8 +13,18 @@ double density(const Graph &g);
 // Returns the maximum degree of the graph.
 gint max_degree(const Graph &g);
 
+
+// Returns the residual degree of a vertex v in a subgraph.
+gint residual_degree(const Graph &g, const vector<vertex> & sub, vertex v);
+
+
 // Returns a pair of the max degree vertex and its degree.
-std::pair<vertex, gint> max_degree_vertex(const Graph &g);
+std::pair<vertex, gint> max_degree_vertex(const Graph &g,const vector<vertex> & sub);
+
+// Returns a pair of the max degree vertex and its residual degree.
+std::pair<vertex, gint> max_residual_degree_vertex(const Graph &g, const vector<vertex> & sub);
+
+
 
 // Returns a pair of  the vector with all the max degree vertices and the maximum degree.
 gint max_degree_vertices(const Graph &g, std::vector<vertex> &vertices);

@@ -26,6 +26,28 @@ gint max_degree(const Graph &g) {
     return max_degree;
 }
 
+
+gint residual_degree(const Graph &g,const vector<vertex> & sub, vertex v){
+    vector<vertex>  sub2(sub);
+    g.intersect_neighbors(sub2, v);
+    return sub2.size();
+}
+
+
+// Returns a pair of the max degree vertex and its residual degree.
+std::pair<vertex, gint> max_residual_degree_vertex(const Graph &g,const vector<vertex> & sub) {
+    gint max_degree = 0;
+    gint max_degree_vertex = 0;
+    for (vertex v : sub) {
+        auto temp(residual_degree(g,sub,v));
+        if (temp > max_degree) {
+            max_degree = temp;
+            max_degree_vertex = v;
+        }
+    }
+    return std::make_pair(max_degree_vertex, max_degree);
+}
+
 // Returns a pair of the max degree vertex and its degree.
 std::pair<gint, gint> max_degree_vertex(const Graph &g) {
     gint max_degree = 0;
