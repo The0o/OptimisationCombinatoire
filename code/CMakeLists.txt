@@ -17,4 +17,14 @@ add_executable(exemple
     utils.cpp
 )
 
+add_executable(mcp_experiments
+    mcp_experiments.cpp
+    mcp.cpp
+    graph.cpp
+    graphs/graphListAdj.cpp
+    graphs/adjmat.cpp
+    graphs/graphAdjMatrix.cpp
+    utils.cpp
+)
+
 #set_property(TARGET ${CMAKE_PROJECT_NAME} PROPERTY CXX_STANDARD 17)
