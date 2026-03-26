@@ -1,10 +1,8 @@
 #pragma once
 
 #include "../graph.hpp"
-#include "adjmat.hpp"
-#include <memory>
 
-class GraphAdjVector : public Graph {
+class GraphAdjVectorSorted : public Graph {
 
   protected:
     // The number of vertices in the graph.
@@ -19,10 +17,10 @@ class GraphAdjVector : public Graph {
     std::vector<std::vector<vertex>> _neighbors_set;
 
   public:
-    GraphAdjVector(std::string &filename){import_dimacs_file(filename);};
-    GraphAdjVector(gint nb_vertices, float proba_edges, gint seed){generate_random(nb_vertices, proba_edges, seed);};
+    GraphAdjVectorSorted(std::string &filename){import_dimacs_file(filename);};
+    GraphAdjVectorSorted(gint nb_vertices, float proba_edges, gint seed){generate_random(nb_vertices, proba_edges, seed);};
 
-    virtual ~GraphAdjVector() = default;
+    virtual ~GraphAdjVectorSorted() = default;
 
     // Returns the number of vertices in the graph.
     virtual gint nb_vertices() const override {return _nb_vertices;};
@@ -48,50 +46,26 @@ class GraphAdjVector : public Graph {
     virtual void get_neighbors(vertex v1, vector<vertex> & sol) const override;
 
     //Intersect in place sorted vector vect with neighbors of v1
-    //virtual void intersect_neighbors(vector<vertex>& vect, vertex v1) const override;
-    //virtual void intersect_neighbors(vector<bool>& vect, vertex v1) const override;
-    //virtual void intersect_neighbors(set<vertex>& s, vertex v1) const override;
+    virtual void intersect_neighbors(vector<vertex> &vect, vertex v1) const override;
+    void intersect_neighbors(vector<bool>& vect, vertex v1) const override;
+    void intersect_neighbors(set<vertex>& s, vertex v1) const override;
+
+
+    //Union in place of  sorted vector vect with neighbors of v1
+    void union_neighbors(vector<vertex>& vect, vertex v1) const override;
+    void union_neighbors(vector<bool>& vect, vertex v1) const override;
+    void union_neighbors(set<vertex>& s, vertex v1) const override;
+
+    //Remove in place from  sorted vector vect the neighbors of v1
+    void diff_neighbors(vector<vertex>& vect, vertex v1) const override;
+    void diff_neighbors(vector<bool>& vect, vertex v1) const override;
+    void diff_neighbors(set<vertex>& s, vertex v1) const override;
+
+    virtual Graph * clone(bool complementary = false) const override;
 
   protected:
     // Reset the graph to a new size nb_vertices.
     virtual void reset(vertex nb_vertices) override;
 };
 
-//considering sorted vectors, few operations to re-implement
-// N.B: add_edge does not keep sortd vectors, managed at the end of constructors
-class GraphAdjVectorSorted : public GraphAdjVector {
 
-  public:
-    GraphAdjVectorSorted(std::string &filename):GraphAdjVector(filename){};
-    GraphAdjVectorSorted(gint nb_vertices, float proba_edges, gint seed):GraphAdjVector(nb_vertices, proba_edges,seed){};
-
-    virtual ~GraphAdjVectorSorted() = default;
-
-
-    // Whether the vertices v1 and v2 are connected by an edge: to re-implement
-    bool is_edge(vertex v1, vertex v2) const override;
-
-    void intersect_neighbors(vector<vertex> &vect, vertex v1) const override;
-
-    // Returns the sorted list of neighbors of the vertex v1: to re-implement
-    std::vector<vertex> neighbors(vertex v1) const override;
-
-};
-
-class GraphHeavy : public GraphAdjVectorSorted {
-    private:
-        std::unique_ptr<AdjMat> _adjMat;
-        void compute_adjency_matrix();
-
-    public:
-        GraphHeavy(std::string &filename):GraphAdjVectorSorted(filename) {compute_adjency_matrix();};
-        GraphHeavy(gint nb_vertices, float proba_edges, gint seed):GraphAdjVectorSorted(nb_vertices, proba_edges,seed){compute_adjency_matrix();};
-
-        virtual ~GraphHeavy() = default;
-
-
-        bool is_edge(vertex v1, vertex v2) const override;
-
-        //void add_edge(vertex v1, vertex v2) override;
-
-};

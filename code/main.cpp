@@ -1,6 +1,7 @@
 
 #include "graphs/graphListAdj.hpp"
 #include "graphs/graphAdjMatrix.hpp"
+#include "graphs/graphHeavy.hpp"
 
 #include <iostream>
 #include "utils.hpp"

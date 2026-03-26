@@ -4,8 +4,8 @@ project(tp_graphes)
 set(CMAKE_CXX_STANDARD 17)
 
 # -Wsign-conversion -Weffc++
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_ARCH_FLAGS} -O0 -g -ldl -lm -isystem dir")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_ARCH_FLAGS} -O3 -DNDEBUG -ldl -lm")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_ARCH_FLAGS} -O0 -g -lm -isystem dir")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_ARCH_FLAGS} -O3 -DNDEBUG -lm")
 
 add_executable(exemple
     main.cpp
@@ -13,6 +13,8 @@ add_executable(exemple
     graphs/graphListAdj.cpp
     graphs/adjmat.cpp
     graphs/graphAdjMatrix.cpp
+    graphs/graphHeavy.cpp
+    
 
     utils.cpp
 )
