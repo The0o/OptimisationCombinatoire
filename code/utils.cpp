@@ -1,6 +1,7 @@
 #include "utils.hpp"
 
 #include <queue>
+#include <algorithm>
 
 
 
@@ -201,3 +202,46 @@ void connected_components(const Graph &graph,  const vector<vertex> & subset_ver
 //    return sol;
 }
 
+
+
+//Fonction utilitaire pour convertir des poids en une clique
+std::vector<vertex> extract_clique(const Graph* g, const std::vector<double>& x) {
+    std::vector<std::pair<double, vertex>> support;
+    for (int i = 0; i < x.size(); ++i) {
+        if (x[i] > 1e-5) support.push_back({x[i], (vertex)i});
+    }
+    std::sort(support.rbegin(), support.rend());
+    
+    std::vector<vertex> res;
+    for (auto& p : support) {
+        bool ok = true;
+        for (vertex u : res) {
+            if (!g->is_edge(u, p.second)) { ok = false; break; }
+        }
+        if (ok) res.push_back(p.second);
+    }
+    return res;
+}
+
+
+//Fonction utilitaire qui permet de remettre les sommets a 1
+std::vector<double> project_onto_simplex(std::vector<double>& y) {
+    int n = y.size();
+    std::vector<std::pair<double, int>> y_indexed(n);
+    for(int i=0; i<n; ++i) y_indexed[i] = {y[i], i};
+
+    std::sort(y_indexed.rbegin(), y_indexed.rend());
+
+    double sum = 0.0, theta = 0.0;
+    //equation de projection
+    for (int i = 0; i < n; ++i) {
+        sum += y_indexed[i].first;
+        double new_theta = (sum - 1.0) / (i + 1.0);
+        if (y_indexed[i].first > new_theta) theta = new_theta;
+        else break;
+    }
+
+    std::vector<double> x(n);
+    for(int i=0; i<n; ++i) x[i] = std::max(0.0, y[i] - theta);
+    return x;
+}

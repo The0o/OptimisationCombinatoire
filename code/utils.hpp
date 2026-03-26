@@ -50,3 +50,5 @@ void connected_components(const Graph &graph,const vector<vertex> & sub, vector<
 // Returns true if the graph is connected (i.e., there is a path between any pair
 // of vertices).
 bool is_connected(const Graph &g);
+std::vector<double> project_onto_simplex(std::vector<double>& y);
+std::vector<vertex> extract_clique(const Graph* g, const std::vector<double>& x);
