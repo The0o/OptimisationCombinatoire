@@ -11,6 +11,12 @@
 #include "utils.hpp"
 #include "weightedgraphDefs.hpp"
 
+//Fonction utilitaire pour checker que le temps n'est pas depasse
+bool is_timeout(std::chrono::high_resolution_clock::time_point start, double limit_ms) {
+    auto now = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration<double, std::milli>(now - start).count() > limit_ms;
+}
+
 // ============= QUESTION 1 =============
 
 //1 FIRST IMPROVEMENT : on prend un point au hasard, on regarde le voisin
@@ -359,11 +365,19 @@ std::vector<vertex> descent_best_improvement_static_weighted_hybrid(const Graph*
 //or si on garde ce fonctionnement, c'est exactement le meme algo (on change pas les aretes, on rajoute juste un poids)
 //donc on va utiliser ce poids EN PLUS des aretes pour realiser l'algo
 std::vector<vertex> descent_best_improvement_dynamic_weighted_hybrid(const Graph* g) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
+
     std::vector<vertex> clique;
     std::vector<vertex> candidates(g->nb_vertices());
     std::iota(candidates.begin(), candidates.end(), 0);
 
     while (!candidates.empty()) {
+
+        if (is_timeout(algo_start, 30000)) { 
+            std::cout << "TIMEOUT" << std::endl;
+            break; 
+        }
+
         vertex best_v = candidates[0];
         double max_score_in_candidates = -1.0;
 
@@ -412,9 +426,14 @@ on reprend le fonctionnement de l'ancien algo hill climbing
 en essayant de changer 1 sommet deja present dans la clique contre 2 autres qui ne sont pas dans la clique
 */
 std::vector<vertex> hill_climbing_weighted(const Graph* g, std::vector<vertex> clique) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
     bool improved = true;
 
     while (improved) {
+        if (is_timeout(algo_start, 30000)) { 
+            std::cout << "TIMEOUT" << std::endl;
+            break; 
+        }
         improved = false;
 
         //ETAPE 1 : ajout simple (pareil que l'algo de base)
