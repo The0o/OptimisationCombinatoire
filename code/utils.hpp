@@ -52,3 +52,4 @@ void connected_components(const Graph &graph,const vector<vertex> & sub, vector<
 bool is_connected(const Graph &g);
 std::vector<double> project_onto_simplex(std::vector<double>& y);
 std::vector<vertex> extract_clique(const Graph* g, const std::vector<double>& x);
+double clique_weight(const Graph* g, const std::vector<vertex>& clique);

@@ -2,6 +2,7 @@
 
 #include <queue>
 #include <algorithm>
+#include "weightedgraphDefs.hpp"
 
 
 
@@ -244,4 +245,13 @@ std::vector<double> project_onto_simplex(std::vector<double>& y) {
     std::vector<double> x(n);
     for(int i=0; i<n; ++i) x[i] = std::max(0.0, y[i] - theta);
     return x;
+}
+
+//Fonction utilitaire qui calcule le poids d'un grpahe (utilise pour la question 3)
+double clique_weight(const Graph* g, const std::vector<vertex>& clique) {
+    double total_weight = 0.0;
+    for (vertex v : clique) {
+        total_weight += getVertexWeight(*g, v); 
+    }
+    return total_weight;
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include "../../graphs/graphDefs.hpp"
-#include "../../graphs/graph.hpp"
+#include "graphDefs.hpp"
+#include "graph.hpp"
 
 using weight = gint;
 

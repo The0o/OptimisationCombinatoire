@@ -5,6 +5,9 @@
 
 #include <iostream>
 #include "utils.hpp"
+#include "mcp_experiment.hpp"
+
+using namespace std;
 
 
 void print_vector(vector<vertex> vec){
@@ -30,6 +33,7 @@ int main(int argc , char* argv [])
     //GraphAdjVector g(100,0.8,2);
     //GraphAdjMatrix g(100,0.8,2);
     GraphHeavy g(100,0.8,2);
+    run_mcp_experiments(&g);
 
 
 // Returns the density of the graph.

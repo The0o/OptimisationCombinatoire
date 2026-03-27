@@ -14,8 +14,8 @@ add_executable(exemple
     graphs/adjmat.cpp
     graphs/graphAdjMatrix.cpp
     graphs/graphHeavy.cpp
-    
-
+    mcp_experiment.cpp
+    weightedgraphDefs.cpp
     utils.cpp
 )
 

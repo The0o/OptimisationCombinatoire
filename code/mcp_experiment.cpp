@@ -7,6 +7,7 @@
 #include <cmath>
 #include "graph.hpp"
 #include "utils.hpp"
+#include "weightedgraphDefs.hpp"
 
 // ============= QUESTION 1 =============
 
@@ -260,6 +261,96 @@ std::vector<vertex> multi_start_gradient(const Graph* g, int num_runs, bool adap
     return best_clique;
 }
 
+// ============= QUESTION 3 =============
+
+//FIRST IMPROVEMENT WEIGHTED : c'est exactement la meme fonction qua sans ponderee
+//je la cree juste pour simplifier les tests plus tard
+std::vector<vertex> descent_first_improvement_weighted(const Graph* g, int seed = 42) {
+    std::vector<vertex> clique;
+    std::vector<vertex> candidates(g->nb_vertices());
+    std::iota(candidates.begin(), candidates.end(), 0);
+
+    std::mt19937 gen(seed);
+    std::shuffle(candidates.begin(), candidates.end(), gen);
+
+    for (vertex v : candidates) {
+        bool can_add = true;
+        for (vertex u : clique) {
+            if (!g->is_edge(u, v)) {
+                can_add = false;
+                break;
+            }
+        }
+        if (can_add) {
+            clique.push_back(v);
+        }
+    }
+    return clique;
+}
+
+//BEST IMPROVEMENT AVEC POIDS
+std::vector<vertex> descent_best_improvement_static_weighted(const Graph* g) {
+    std::vector<vertex> clique;    
+    std::vector<vertex> candidates(g->nb_vertices());
+    std::iota(candidates.begin(), candidates.end(), 0);
+
+    //on change juste le tri
+    std::sort(candidates.begin(), candidates.end(), [g](vertex a, vertex b) {
+        return getVertexWeight(*g, a) > getVertexWeight(*g, b); 
+    });
+
+    for (vertex v : candidates) {
+        bool can_add = true;
+        for (vertex u : clique) {
+            if (!g->is_edge(u, v)) {
+                can_add = false;
+                break;
+            }
+        }
+        
+        if (can_add) {
+            clique.push_back(v);
+        }
+    }
+    return clique;
+}
+
+//BEST IMPROVEMENT STATIQUE AVEC POIDS HYBRIDE
+//on va mixer le poids des aretes + le nombre de voisin pour faire la decision
+std::vector<vertex> descent_best_improvement_static_weighted_hybrid(const Graph* g) {
+    std::vector<vertex> clique;
+    std::vector<vertex> candidates(g->nb_vertices());
+    std::iota(candidates.begin(), candidates.end(), 0);
+
+    //on a juste a change le tri ducoup
+    std::sort(candidates.begin(), candidates.end(), [g](vertex a, vertex b) {
+        double weight_a = getVertexWeight(*g, a);
+        double weight_b = getVertexWeight(*g, b);
+        
+        double degree_a = g->degree(a);
+        double degree_b = g->degree(b);
+        
+        //pour le score je multiple le poids et le nombre de voisin, jsp si c'est le plus efficace
+        double score_a = weight_a * degree_a;
+        double score_b = weight_b * degree_b;
+        
+        return score_a > score_b; 
+    });
+
+    for (vertex v : candidates) {
+        bool can_add = true;
+        for (vertex u : clique) {
+            if (!g->is_edge(u, v)) {
+                can_add = false;
+                break;
+            }
+        }
+        if (can_add) {
+            clique.push_back(v);
+        }
+    }
+    return clique; 
+}
 
 //Fonction principale pour lancer les experiences
 void run_mcp_experiments(const Graph* g) {}
