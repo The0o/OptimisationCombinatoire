@@ -352,5 +352,160 @@ std::vector<vertex> descent_best_improvement_static_weighted_hybrid(const Graph*
     return clique; 
 }
 
+//3 BEST IMPROVEMENT DYNAMIQUE HYBRIDE
+//Hybride parce que l'algo de base est gere grace au nombres d'aretes pour chaque sommet
+//or si on garde ce fonctionnement, c'est exactement le meme algo (on change pas les aretes, on rajoute juste un poids)
+//donc on va utiliser ce poids EN PLUS des aretes pour realiser l'algo
+std::vector<vertex> descent_best_improvement_dynamic_weighted_hybrid(const Graph* g) {
+    std::vector<vertex> clique;
+    std::vector<vertex> candidates(g->nb_vertices());
+    std::iota(candidates.begin(), candidates.end(), 0);
+
+    while (!candidates.empty()) {
+        vertex best_v = candidates[0];
+        double max_score_in_candidates = -1.0;
+
+        //calcul du nombre de sommet amis parmis les sommets pas dans la clique
+        for (vertex v : candidates) {
+            int degree = 0;
+            for (vertex u : candidates) {
+                if (v != u && g->is_edge(v, u)) {
+                    degree++;
+                }
+            }
+            
+            double score = (double)degree * getVertexWeight(*g, v);
+            //pour calculer le socre, on multiplie le nombre de sommets amis pas dans le clique
+            //MULTIPLIE par leur poids
+            
+            if (score > max_score_in_candidates) {
+                max_score_in_candidates = score;
+                best_v = v;
+            }
+        }
+
+        clique.push_back(best_v);
+
+        std::vector<vertex> new_candidates;
+        for (vertex v : candidates) {
+            if (v != best_v && g->is_edge(best_v, v)) {
+                new_candidates.push_back(v);
+            }
+        }
+        candidates = std::move(new_candidates);
+    }
+    return clique;
+}
+
+/*
+HILL CLIMBING PONDERE
+l'algo va se passer en deux etapes :
+ETAPE 1 :
+maintenant qu'on a des poids, au lieu d'essayer de changer 1 sommet contre 2, on va
+essayer de changer 1 sommet contre 1, mais uniquement si l'arete de ce sommet a un plus gros poids
+que celui qu'on va enlever
+On continue ca jusqu'a que ça bloque
+Quand ca bloque, on passe a l'etape 2 :
+on reprend le fonctionnement de l'ancien algo hill climbing
+en essayant de changer 1 sommet deja present dans la clique contre 2 autres qui ne sont pas dans la clique
+*/
+std::vector<vertex> hill_climbing_weighted(const Graph* g, std::vector<vertex> clique) {
+    bool improved = true;
+
+    while (improved) {
+        improved = false;
+
+        //ETAPE 1 : ajout simple (pareil que l'algo de base)
+        for (vertex v = 0; v < g->nb_vertices(); ++v) {
+            if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+
+            bool can_add = true;
+            for (vertex u : clique) {
+                if (!g->is_edge(u, v)) { can_add = false; break; }
+            }
+
+            if (can_add) {
+                clique.push_back(v);
+                improved = true;
+                break;
+            }
+        }
+        if (improved) continue;
+
+        //Etape 2 : echange 1 contre 1
+        for (size_t i = 0; i < clique.size(); ++i) {
+            vertex u = clique[i];
+            double weight_u = getVertexWeight(*g, u);
+            //le poids de u, il va falloir trouver mieux que u
+            bool swap_done = false;
+
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                
+                double weight_v = getVertexWeight(*g, v);
+                //le poids de v
+                
+                if (weight_v <= weight_u) continue; 
+                //si le poids de v est meilleur que u
+
+                bool valid = true;
+                for (size_t j = 0; j < clique.size(); ++j) {
+                    if (i != j && !g->is_edge(clique[j], v)) { valid = false; break; }
+                }
+                //il faut quand meme verifier que v est un arete avec tout ceux de la clique actuelle,
+                //sinon c'est plus une clique
+                
+                if (valid) {
+                    clique.erase(clique.begin() + i);
+                    clique.push_back(v);
+                    improved = true;
+                    swap_done = true;
+                    break;
+                }
+            }
+            if (swap_done) break;
+        }
+        if (improved) continue;
+
+        //ETAPE 3 : on echange 1 contre 2 (pareil que l'algo de base sauf qu'on checke les poids par contre)
+        for (size_t i = 0; i < clique.size(); ++i) {
+            vertex u = clique[i];
+            double weight_u = getVertexWeight(*g, u);
+            std::vector<vertex> valid_replacements;
+
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                //sommet qui n'est pas dans la clique actuelle
+
+                bool valid = true;
+                for (size_t j = 0; j < clique.size(); ++j) {
+                    if (i != j && !g->is_edge(clique[j], v)) { valid = false; break; }
+                    //condition i==j pour checker que u n'est pas pris
+                }
+                if (valid) valid_replacements.push_back(v);
+            }
+
+            bool swap_done = false;
+            for (size_t idx1 = 0; idx1 < valid_replacements.size(); ++idx1) {
+                for (size_t idx2 = idx1 + 1; idx2 < valid_replacements.size(); ++idx2) {
+                    vertex v1 = valid_replacements[idx1];
+                    vertex v2 = valid_replacements[idx2];
+                    if (g->is_edge(v1, v2) && (getVertexWeight(*g, v1) + getVertexWeight(*g, v2) > weight_u)) {
+                        clique.erase(clique.begin() + i);
+                        clique.push_back(v1);
+                        clique.push_back(v2);
+                        improved = true;
+                        swap_done = true;
+                        break;
+                    }
+                }
+                if (swap_done) break;
+            }
+            if (swap_done) break;
+        }
+    }
+    return clique;
+}
+
 //Fonction principale pour lancer les experiences
 void run_mcp_experiments(const Graph* g) {}
