@@ -75,11 +75,17 @@ std::vector<vertex> descent_best_improvement_static(const Graph* g) {
 //sauf que cette fois, au lieu de regarder le sommet qui a le plus d'aretes,
 //on prend le sommet qui a le plus d'aretes parmi les sommets encore valides
 std::vector<vertex> descent_best_improvement_dynamic(const Graph* g) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
     std::vector<vertex> clique;
     std::vector<vertex> candidates(g->nb_vertices());
     std::iota(candidates.begin(), candidates.end(), 0);
 
     while (!candidates.empty()) {
+        if (is_timeout(algo_start, 10000)) { 
+            std::cout << "TIMEOUT" << std::endl;
+            break; 
+        }
+
         vertex best_v = candidates[0];
         int max_degree_in_candidates = -1;
 
@@ -114,9 +120,15 @@ std::vector<vertex> descent_best_improvement_dynamic(const Graph* g) {
 //si on en trouve un, on le rajoute. On fait ça jusqu'a qu'on puisse plus en rajouter
 //a ce moment là, on essaye d'enlever un sommet à la condition qu'on peut en rajouter deux derrieres
 std::vector<vertex> hill_climbing(const Graph* g, std::vector<vertex> clique) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
     bool improved = true;
 
     while (improved) {
+        if (is_timeout(algo_start, 10000)) { 
+            std::cout << "TIMEOUT" << std::endl;
+            break; 
+        }
+
         improved = false;
 
         //Etape 1 : chercher un sommet qui n'est pas dans la clique mais qui a une arete avec tout le monde de la clique
@@ -373,7 +385,7 @@ std::vector<vertex> descent_best_improvement_dynamic_weighted_hybrid(const Graph
 
     while (!candidates.empty()) {
 
-        if (is_timeout(algo_start, 30000)) { 
+        if (is_timeout(algo_start, 10000)) { 
             std::cout << "TIMEOUT" << std::endl;
             break; 
         }
@@ -430,7 +442,7 @@ std::vector<vertex> hill_climbing_weighted(const Graph* g, std::vector<vertex> c
     bool improved = true;
 
     while (improved) {
-        if (is_timeout(algo_start, 30000)) { 
+        if (is_timeout(algo_start, 10000)) { 
             std::cout << "TIMEOUT" << std::endl;
             break; 
         }
@@ -572,7 +584,8 @@ void run_benchmark_Q1_discrete(const std::vector<std::string>& instances, const 
             sum_size_hc += size_hc;
             total_time_hc += time_hc;
 
-            csv << inst_name << ";Q1_HC_Seed_" << i << ";" << size_hc << ";;;;" << time_hc << ";\n";
+            std::string status_hc = (time_hc >= 10000) ? "TIMEOUT" : "OK";
+            csv << inst_name << ";Q1_HC_Seed_" << i << ";" << size_hc << ";;;;" << time_hc << ";" << status_hc << "\n";
         }
         
         csv << inst_name << ";Q1_FI_STATS_SUMMARY;;" << min_size_fi << ";" << max_size_fi << ";" << (sum_size_fi / 10.0) << ";" << total_time_fi << ";\n"; 
@@ -591,7 +604,9 @@ void run_benchmark_Q1_discrete(const std::vector<std::string>& instances, const 
             //on check juste que le nombre d'aretes est pas abuse sinon l'ordi va jamais reussir a le faire tourner
             auto s_dy = std::chrono::high_resolution_clock::now();
             auto c_dy = descent_best_improvement_dynamic(&g); 
-            csv << inst_name << ";Q1_Best_Dynamic;" << c_dy.size() << ";;;;" << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now()-s_dy).count() << ";\n";
+            double time_dy = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now()-s_dy).count();
+            std::string status_dy = (time_dy >= 10000) ? "TIMEOUT" : "OK";
+            csv << inst_name << ";Q1_Best_Dynamic;" << c_dy.size() << ";;;;" << time_dy << ";" << status_dy << "\n";
         } else {
             csv << inst_name << ";Q1_Best_Dynamic;0;;;;0;SKIP_TOO_LARGE\n";
         }
@@ -681,7 +696,8 @@ void run_benchmark_Q3_weighted(const std::vector<std::string>& instances, const 
             if (w_hc > max_w_hc) max_w_hc = w_hc;
             sum_w_hc += w_hc; time_hc += t_hc;
 
-            csv << inst_name << ";Q3_HC_Seed_" << i << ";" << w_hc << ";;;;" << t_hc << ";OK\n";
+            std::string status_hc = (t_hc >= 10000) ? "TIMEOUT" : "OK";
+            csv << inst_name << ";Q3_HC_Seed_" << i << ";" << w_hc << ";;;;" << t_hc << ";" << status_hc << "\n";
         }
         
         csv << inst_name << ";Q3_FI_STATS_SUMMARY;;" << min_w_fi << ";" << max_w_fi << ";" << (sum_w_fi / 10.0) << ";" << time_fi << ";OK\n";
@@ -694,7 +710,10 @@ void run_benchmark_Q3_weighted(const std::vector<std::string>& instances, const 
             auto c = f(&g);
             auto e = std::chrono::high_resolution_clock::now();
             double w = clique_weight(&g, c);
-            csv << inst_name << ";" << n << ";" << w << ";;;;" << std::chrono::duration<double, std::milli>(e-s).count() << ";OK\n";
+            double t = std::chrono::duration<double, std::milli>(e-s).count();
+            
+            std::string status = (t >= 10000) ? "TIMEOUT" : "OK";
+            csv << inst_name << ";" << n << ";" << w << ";;;;" << t << ";" << status << "\n";
         };
 
         run_w("Q3_Static_Poids", descent_best_improvement_static_weighted);
