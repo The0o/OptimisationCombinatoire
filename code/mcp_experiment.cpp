@@ -5,6 +5,8 @@
 #include <chrono>
 #include <random>
 #include <cmath>
+#include <fstream>
+#include "graphs/graphHeavy.hpp"
 #include "graph.hpp"
 #include "utils.hpp"
 #include "weightedgraphDefs.hpp"
@@ -225,7 +227,7 @@ std::vector<double> projected_gradient_step_adaptive(const Graph* g, std::vector
 }
 
 //Fonction multi start : celle qui lance vraiment les tests de la question 2
-std::vector<vertex> multi_start_gradient(const Graph* g, int num_runs, bool adaptive) {
+std::vector<vertex> multi_start_gradient(const Graph* g, int num_runs, bool adaptive, double starting_alpha) {
     std::vector<vertex> best_clique;
     std::mt19937 gen(12345);
     std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -242,8 +244,8 @@ std::vector<vertex> multi_start_gradient(const Graph* g, int num_runs, bool adap
         for(int i=0; i<n; ++i) x[i] /= sum;
         //on donne un poids totalement au hasard, et on met le total a 1
 
-        double alpha = 0.05; //alpha de base, A ADAPTER
-        
+        double alpha = starting_alpha;
+
         //Boucle de 100, A ADAPTER
         for (int iter = 0; iter < 100; ++iter) {
             if (adaptive) {
@@ -507,5 +509,184 @@ std::vector<vertex> hill_climbing_weighted(const Graph* g, std::vector<vertex> c
     return clique;
 }
 
-//Fonction principale pour lancer les experiences
-void run_mcp_experiments(const Graph* g) {}
+void run_benchmark_Q1_discrete(const std::vector<std::string>& instances, const std::string& output_filename) {
+    std::ofstream csv(output_filename);
+    csv << "Instance;Algorithme;Taille_Clique;Taille_Min;Taille_Max;Taille_Moyenne;Temps_ms;Notes\n";
+
+    for (const std::string& inst_name : instances) {
+        std::cout << "Lancement Benchmark Q1 INSTANCE" << std::endl;
+
+        std::string filename = inst_name;
+        GraphHeavy g(filename);
+        auto total_start = std::chrono::high_resolution_clock::now();
+
+        double min_size_fi = 1e9, max_size_fi = -1, sum_size_fi = 0, total_time_fi = 0; 
+        double min_size_hc = 1e9, max_size_hc = -1, sum_size_hc = 0, total_time_hc = 0;
+        //on va le lancer 10 fois pour eviter un coup de chance ou malchance
+        for (int i = 0; i < 10; ++i) {
+
+            //FIRST IMPROVEMENT
+
+            auto s_fi = std::chrono::high_resolution_clock::now();
+            auto c_fi = descent_first_improvement(&g, i);
+            auto e_fi = std::chrono::high_resolution_clock::now();
+            
+            double size_fi = c_fi.size(); 
+            double time_fi = std::chrono::duration<double, std::milli>(e_fi-s_fi).count(); 
+            if (size_fi < min_size_fi) min_size_fi = size_fi; 
+            if (size_fi > max_size_fi) max_size_fi = size_fi; 
+            sum_size_fi += size_fi; 
+            total_time_fi += time_fi; 
+
+            csv << inst_name << ";Q1_FI_Seed_" << i << ";" << size_fi << ";;;;" << time_fi << ";\n"; 
+
+            //HILL CLIMBING
+
+            auto s_hc = std::chrono::high_resolution_clock::now();
+            auto c_hc = hill_climbing(&g, c_fi);
+            auto e_hc = std::chrono::high_resolution_clock::now();
+            
+            double size_hc = c_hc.size();
+            double time_hc = std::chrono::duration<double, std::milli>(e_hc-s_hc).count();
+            if (size_hc < min_size_hc) min_size_hc = size_hc;
+            if (size_hc > max_size_hc) max_size_hc = size_hc;
+            sum_size_hc += size_hc;
+            total_time_hc += time_hc;
+
+            csv << inst_name << ";Q1_HC_Seed_" << i << ";" << size_hc << ";;;;" << time_hc << ";\n";
+        }
+        
+        csv << inst_name << ";Q1_FI_STATS_SUMMARY;;" << min_size_fi << ";" << max_size_fi << ";" << (sum_size_fi / 10.0) << ";" << total_time_fi << ";\n"; 
+        csv << inst_name << ";Q1_HC_STATS_SUMMARY;;" << min_size_hc << ";" << max_size_hc << ";" << (sum_size_hc / 10.0) << ";" << total_time_hc << ";\n";
+        //on ajoute la moyenne de temps, meilleur clique, pire clique
+
+        //BEST STATIC
+
+        //Pour les autres, pas besoin de tester 10 fois vu que ça donnera toujours le meme resultat
+        auto s_st = std::chrono::high_resolution_clock::now();
+        auto c_st = descent_best_improvement_static(&g);
+        csv << inst_name << ";Q1_Best_Static;" << c_st.size() << ";;;;" << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now()-s_st).count() << ";\n";
+
+        //BEST DYNAMIC
+        if (g.nb_vertices() < 1500) {
+            //on check juste que le nombre d'aretes est pas abuse sinon l'ordi va jamais reussir a le faire tourner
+            auto s_dy = std::chrono::high_resolution_clock::now();
+            auto c_dy = descent_best_improvement_dynamic(&g); 
+            csv << inst_name << ";Q1_Best_Dynamic;" << c_dy.size() << ";;;;" << std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now()-s_dy).count() << ";\n";
+        } else {
+            csv << inst_name << ";Q1_Best_Dynamic;0;;;;0;SKIP_TOO_LARGE\n";
+        }
+    }
+    csv.close();
+}
+
+
+void run_benchmark_Q2_gradient(const std::vector<std::string>& instances, const std::string& output_filename) {
+    std::ofstream csv(output_filename);
+    csv << "Instance;Alpha_Depart;Mode;Runs;Taille_Clique;Temps_ms\n";
+
+    std::vector<double> alphas = {0.01, 0.05, 0.1}; 
+    std::vector<int> runs_list = {1, 10};
+
+    for (const std::string& inst_name : instances) {
+        std::cout << "Lancement Benchmark Q2 INSTANCE" << std::endl;
+
+        std::string filename = inst_name;
+        GraphHeavy g(filename);
+
+        //si le graphe est trop grand on fait pas
+        if (g.nb_vertices() >= 1500) {
+            csv << inst_name << ";0;SKIP;0;0;0;SKIP_TOO_LARGE\n";
+            continue;
+        }
+
+        //double boucle qui prend en params les donnees qu'on veut tester : alpha (taille du pas) et le nombre de lancement (pour le lancer a des endroits au hasard)
+        for (double a : alphas) {
+            for (int r : runs_list) {
+
+                //partie non adaptative
+                auto start = std::chrono::high_resolution_clock::now();
+                auto c_fixe = multi_start_gradient(&g, r, false, a); 
+                auto end = std::chrono::high_resolution_clock::now();
+                csv << inst_name << ";" << a << ";Fixe;" << r << ";" << c_fixe.size() << ";" << std::chrono::duration<double, std::milli>(end - start).count() << "\n";
+
+                //partie adaptative
+                start = std::chrono::high_resolution_clock::now();
+                auto c_adapt = multi_start_gradient(&g, r, true, a); 
+                end = std::chrono::high_resolution_clock::now();
+                csv << inst_name << ";" << a << ";Adaptatif;" << r << ";" << c_adapt.size() << ";" << std::chrono::duration<double, std::milli>(end - start).count() << "\n";
+            }
+        }
+    }
+    csv.close();
+}
+
+
+void run_benchmark_Q3_weighted(const std::vector<std::string>& instances, const std::string& output_filename) {
+    std::ofstream csv(output_filename);
+    csv << "Instance;Algorithme;Poids_Total;Poids_Min;Poids_Max;Poids_Moyenne;Temps_ms;Statut\n";
+
+    for (const std::string& inst_name : instances) {
+        std::cout << "Lancement Benchmark Q3 INSTANCE" << std::endl;
+        std::string filename = inst_name;
+        GraphHeavy g(filename);
+
+        double min_w_fi = 1e9, max_w_fi = -1, sum_w_fi = 0, time_fi = 0;
+        double min_w_hc = 1e9, max_w_hc = -1, sum_w_hc = 0, time_hc = 0;
+
+        //on va le lancer 10 fois pour eviter un coup de chance ou malchance
+        for (int i = 0; i < 10; ++i) {
+            //FIRST IMPROVEMENT
+
+            auto s_fi = std::chrono::high_resolution_clock::now();
+            auto c_fi = descent_first_improvement_weighted(&g, i);
+            auto e_fi = std::chrono::high_resolution_clock::now();
+            
+            double w_fi = clique_weight(&g, c_fi);
+            double t_fi = std::chrono::duration<double, std::milli>(e_fi - s_fi).count();
+            if (w_fi < min_w_fi) min_w_fi = w_fi;
+            if (w_fi > max_w_fi) max_w_fi = w_fi;
+            sum_w_fi += w_fi; time_fi += t_fi;
+
+            csv << inst_name << ";Q3_FI_Seed_" << i << ";" << w_fi << ";;;;" << t_fi << ";OK\n";
+
+            //HILL CLIMBING
+
+            auto s_hc = std::chrono::high_resolution_clock::now();
+            auto c_hc = hill_climbing_weighted(&g, c_fi);
+            auto e_hc = std::chrono::high_resolution_clock::now();
+
+            double w_hc = clique_weight(&g, c_hc);
+            double t_hc = std::chrono::duration<double, std::milli>(e_hc - s_hc).count();
+            if (w_hc < min_w_hc) min_w_hc = w_hc;
+            if (w_hc > max_w_hc) max_w_hc = w_hc;
+            sum_w_hc += w_hc; time_hc += t_hc;
+
+            csv << inst_name << ";Q3_HC_Seed_" << i << ";" << w_hc << ";;;;" << t_hc << ";OK\n";
+        }
+        
+        csv << inst_name << ";Q3_FI_STATS_SUMMARY;;" << min_w_fi << ";" << max_w_fi << ";" << (sum_w_fi / 10.0) << ";" << time_fi << ";OK\n";
+        csv << inst_name << ";Q3_HC_STATS_SUMMARY;;" << min_w_hc << ";" << max_w_hc << ";" << (sum_w_hc / 10.0) << ";" << time_hc << ";OK\n";
+        //on ajoute la moyenne de temps, meilleur clique, pire clique
+
+        //fonction anonyme
+        auto run_w = [&](std::string n, auto f) {
+            auto s = std::chrono::high_resolution_clock::now();
+            auto c = f(&g);
+            auto e = std::chrono::high_resolution_clock::now();
+            double w = clique_weight(&g, c);
+            csv << inst_name << ";" << n << ";" << w << ";;;;" << std::chrono::duration<double, std::milli>(e-s).count() << ";OK\n";
+        };
+
+        run_w("Q3_Static_Poids", descent_best_improvement_static_weighted);
+        run_w("Q3_Static_Hybride", descent_best_improvement_static_weighted_hybrid);
+        
+        if (g.nb_vertices() < 1500) {
+
+            run_w("Q3_Dynamic_Hybride", descent_best_improvement_dynamic_weighted_hybrid);
+        } else {
+            csv << inst_name << ";Q3_Dynamic_Hybride;0;;;;0;SKIP_TOO_LARGE\n";
+        }
+    }
+    csv.close();
+}
