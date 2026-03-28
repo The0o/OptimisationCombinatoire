@@ -926,12 +926,12 @@ void run_benchmark_Q4_hybrid(const std::vector<std::string>& instances, const st
                 double time_hc = std::chrono::duration<double, std::milli>(e_hc-s_hc).count();
                 
                 std::string status = (time_hc >= 10000) ? "TIMEOUT" : "OK";
-                csv << inst_name << ";MCP;Hybrid_HC_Steepest;" << hc_mcp.size() << ";" << (time_dy + time_hc) << ";" << status << "\n";
+                csv << inst_name << ";MCP;HC_Hybrid_Steepest;" << hc_mcp.size() << ";" << (time_dy + time_hc) << ";" << status << "\n";
             } else {
-                csv << inst_name << ";MCP;Hybrid_HC_Steepest;" << seed_mcp.size() << ";" << time_dy << ";TIMEOUT_SEED\n";
+                csv << inst_name << ";MCP;HC_Hybrid_Steepest;" << seed_mcp.size() << ";" << time_dy << ";TIMEOUT_SEED\n";
             }
         } else {
-            csv << inst_name << ";MCP;Hybrid_HC_Steepest;0;0;SKIP_TOO_LARGE\n";
+            csv << inst_name << ";MCP;HC_Hybrid_Steepest;0;0;SKIP_TOO_LARGE\n";
         }
 
         // --- 2. WMCP (Pondéré) ---
@@ -947,7 +947,7 @@ void run_benchmark_Q4_hybrid(const std::vector<std::string>& instances, const st
         double time_whc = std::chrono::duration<double, std::milli>(e_whc-s_whc).count();
         
         std::string status_w = (time_whc >= 10000) ? "TIMEOUT" : "OK";
-        csv << inst_name << ";WMCP;Hybrid_HC_Weighted_Steepest;" << clique_weight(&g, hc_wmcp) << ";" << (time_st + time_whc) << ";" << status_w << "\n";
+        csv << inst_name << ";WMCP;HC_Hybrid_Weight_Steepest;" << clique_weight(&g, hc_wmcp) << ";" << (time_st + time_whc) << ";" << status_w << "\n";
     }
     csv.close();
 }
