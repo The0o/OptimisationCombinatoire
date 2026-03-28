@@ -728,3 +728,226 @@ void run_benchmark_Q3_weighted(const std::vector<std::string>& instances, const 
     }
     csv.close();
 }
+
+// ============= QUESTION 4 =============
+
+// HILL CLIMBING HYBRIDE STEEPEST (Pour MCP Non pondéré)
+// On cherche le meilleur echange 1 contre 2 (celui ou la somme des degres est la plus haute)
+std::vector<vertex> hill_climbing_steepest(const Graph* g, std::vector<vertex> clique) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
+    bool improved = true;
+
+    while (improved) {
+        if (is_timeout(algo_start, 10000)) break;
+        improved = false;
+
+        // Etape 1: Ajout simple (on prend le sommet avec le plus grand degre)
+        int best_add_v = -1;
+        int max_deg = -1;
+        for (vertex v = 0; v < g->nb_vertices(); ++v) {
+            if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+            bool can_add = true;
+            for (vertex u : clique) {
+                if (!g->is_edge(u, v)) { can_add = false; break; }
+            }
+            if (can_add) {
+                int deg = g->degree(v);
+                if (deg > max_deg) { max_deg = deg; best_add_v = v; }
+            }
+        }
+        
+        if (best_add_v != -1) {
+            clique.push_back(best_add_v);
+            improved = true;
+            continue;
+        }
+
+        // Etape 2: 1 contre 2 (Steepest Ascent)
+        int best_i = -1;
+        vertex best_v1 = -1, best_v2 = -1;
+        int max_degree_sum = -1;
+
+        for (size_t i = 0; i < clique.size(); ++i) {
+            vertex u = clique[i];
+            std::vector<vertex> valid_replacements;
+            
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                bool valid = true;
+                for (size_t j = 0; j < clique.size(); ++j) {
+                    if (i != j && !g->is_edge(clique[j], v)) { valid = false; break; }
+                }
+                if (valid) valid_replacements.push_back(v);
+            }
+
+            for (size_t idx1 = 0; idx1 < valid_replacements.size(); ++idx1) {
+                for (size_t idx2 = idx1 + 1; idx2 < valid_replacements.size(); ++idx2) {
+                    vertex v1 = valid_replacements[idx1];
+                    vertex v2 = valid_replacements[idx2];
+                    if (g->is_edge(v1, v2)) {
+                        int current_degree_sum = g->degree(v1) + g->degree(v2);
+                        if (current_degree_sum > max_degree_sum) {
+                            max_degree_sum = current_degree_sum;
+                            best_i = i;
+                            best_v1 = v1;
+                            best_v2 = v2;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (best_i != -1) {
+            clique.erase(clique.begin() + best_i);
+            clique.push_back(best_v1);
+            clique.push_back(best_v2);
+            improved = true;
+        }
+    }
+    return clique;
+}
+
+// HILL CLIMBING PONDERE HYBRIDE STEEPEST (Pour WMCP)
+// On va fusionner 1 contre 1 et 1 contre 2 pour chercher a chaque fois le gain de poids MAXIMUM
+std::vector<vertex> hill_climbing_weighted_steepest(const Graph* g, std::vector<vertex> clique) {
+    auto algo_start = std::chrono::high_resolution_clock::now();
+    bool improved = true;
+
+    while (improved) {
+        if (is_timeout(algo_start, 10000)) break;
+        improved = false;
+
+        // ETAPE 1 : ajout simple (Steepest)
+        int best_add_v = -1;
+        double best_add_weight = -1.0;
+        for (vertex v = 0; v < g->nb_vertices(); ++v) {
+            if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+            bool can_add = true;
+            for (vertex u : clique) {
+                if (!g->is_edge(u, v)) { can_add = false; break; }
+            }
+            if (can_add) {
+                double w = getVertexWeight(*g, v);
+                if (w > best_add_weight) {
+                    best_add_weight = w;
+                    best_add_v = v;
+                }
+            }
+        }
+        if (best_add_v != -1) {
+            clique.push_back(best_add_v);
+            improved = true;
+            continue;
+        }
+
+        // Etape 2 & 3: echange 1 contre 1 et 1 contre 2 fusionnes pour le plus grand gain de poids global
+        int best_i = -1;
+        vertex best_v1 = -1, best_v2 = -1; // v2 = -1 signifie qu'on fait du 1 contre 1
+        double max_weight_gain = 0.0; // On ne fait un swap que si le gain > 0
+
+        for (size_t i = 0; i < clique.size(); ++i) {
+            vertex u = clique[i];
+            double weight_u = getVertexWeight(*g, u);
+            std::vector<vertex> valid_replacements;
+
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                bool valid = true;
+                for (size_t j = 0; j < clique.size(); ++j) {
+                    if (i != j && !g->is_edge(clique[j], v)) { valid = false; break; }
+                }
+                if (valid) valid_replacements.push_back(v);
+            }
+
+            // Test de tous les echanges 1 contre 1 possibles
+            for (vertex v : valid_replacements) {
+                double gain = getVertexWeight(*g, v) - weight_u;
+                if (gain > max_weight_gain) {
+                    max_weight_gain = gain;
+                    best_i = i;
+                    best_v1 = v;
+                    best_v2 = -1;
+                }
+            }
+
+            // Test de tous les echanges 1 contre 2 possibles
+            for (size_t idx1 = 0; idx1 < valid_replacements.size(); ++idx1) {
+                for (size_t idx2 = idx1 + 1; idx2 < valid_replacements.size(); ++idx2) {
+                    vertex v1 = valid_replacements[idx1];
+                    vertex v2 = valid_replacements[idx2];
+                    if (g->is_edge(v1, v2)) {
+                        double gain = (getVertexWeight(*g, v1) + getVertexWeight(*g, v2)) - weight_u;
+                        if (gain > max_weight_gain) {
+                            max_weight_gain = gain;
+                            best_i = i;
+                            best_v1 = v1;
+                            best_v2 = v2;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (best_i != -1) {
+            clique.erase(clique.begin() + best_i);
+            clique.push_back(best_v1);
+            if (best_v2 != -1) clique.push_back(best_v2);
+            improved = true;
+        }
+    }
+    return clique;
+}
+
+// Fonction de Run Q4 (Sauvegarde dans bench_Q4.csv)
+void run_benchmark_Q4_hybrid(const std::vector<std::string>& instances, const std::string& output_filename) {
+    std::ofstream csv(output_filename);
+    csv << "Instance;Probleme;Algorithme;Score;Temps_ms;Statut\n";
+
+    for (const std::string& inst_name : instances) {
+        std::cout << "Lancement Benchmark Q4 INSTANCE: " << inst_name << std::endl;
+        
+        // --- LA CORRECTION EST ICI ---
+        std::string filename = inst_name;
+        GraphHeavy g(filename);
+        // -----------------------------
+        
+        // --- 1. MCP (Non pondéré) ---
+        if (g.nb_vertices() < 1500) {
+            // Initialisation avec la meilleure heuristique (Best Dynamic)
+            auto s_dy = std::chrono::high_resolution_clock::now();
+            auto seed_mcp = descent_best_improvement_dynamic(&g); 
+            auto e_dy = std::chrono::high_resolution_clock::now();
+            double time_dy = std::chrono::duration<double, std::milli>(e_dy-s_dy).count();
+            
+            if (time_dy < 10000) { 
+                auto s_hc = std::chrono::high_resolution_clock::now();
+                auto hc_mcp = hill_climbing_steepest(&g, seed_mcp); // Hill climber Steepest
+                auto e_hc = std::chrono::high_resolution_clock::now();
+                double time_hc = std::chrono::duration<double, std::milli>(e_hc-s_hc).count();
+                
+                std::string status = (time_hc >= 10000) ? "TIMEOUT" : "OK";
+                csv << inst_name << ";MCP;Hybrid_HC_Steepest;" << hc_mcp.size() << ";" << (time_dy + time_hc) << ";" << status << "\n";
+            } else {
+                csv << inst_name << ";MCP;Hybrid_HC_Steepest;" << seed_mcp.size() << ";" << time_dy << ";TIMEOUT_SEED\n";
+            }
+        } else {
+            csv << inst_name << ";MCP;Hybrid_HC_Steepest;0;0;SKIP_TOO_LARGE\n";
+        }
+
+        // --- 2. WMCP (Pondéré) ---
+        // Initialisation avec la meilleure heuristique rapide (Static Hybride)
+        auto s_st = std::chrono::high_resolution_clock::now();
+        auto seed_wmcp = descent_best_improvement_static_weighted_hybrid(&g);
+        auto e_st = std::chrono::high_resolution_clock::now();
+        double time_st = std::chrono::duration<double, std::milli>(e_st-s_st).count();
+
+        auto s_whc = std::chrono::high_resolution_clock::now();
+        auto hc_wmcp = hill_climbing_weighted_steepest(&g, seed_wmcp); // Hill climber Pondéré Steepest
+        auto e_whc = std::chrono::high_resolution_clock::now();
+        double time_whc = std::chrono::duration<double, std::milli>(e_whc-s_whc).count();
+        
+        std::string status_w = (time_whc >= 10000) ? "TIMEOUT" : "OK";
+        csv << inst_name << ";WMCP;Hybrid_HC_Weighted_Steepest;" << clique_weight(&g, hc_wmcp) << ";" << (time_st + time_whc) << ";" << status_w << "\n";
+    }
+    csv.close();
+}

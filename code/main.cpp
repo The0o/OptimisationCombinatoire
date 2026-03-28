@@ -1,14 +1,14 @@
-
 #include "graphs/graphListAdj.hpp"
 #include "graphs/graphAdjMatrix.hpp"
 #include "graphs/graphHeavy.hpp"
 
 #include <iostream>
+#include <chrono>   // Pour mesurer le temps
+#include <iomanip>  // Pour formater le tableau (std::setw)
 #include "utils.hpp"
 #include "mcp_experiment.hpp"
 
 using namespace std;
-
 
 void print_vector(vector<vertex> vec){
     for (auto v : vec) {
@@ -43,14 +43,53 @@ int main(int argc , char* argv [])
         "san/sanr200_0.9.clq", "san/sanr400_0.5.clq", "san/sanr400_0.7.clq"
     };
 
-    std::cout << "Benchmark Q1" << std::endl;
-    run_benchmark_Q1_discrete(instances, "bench_Q1.csv");
+    double t_q1 = 0, t_q2 = 0, t_q3 = 0, t_q4 = 0;
 
-    std::cout << "Benchmark Q2" << std::endl;
-    run_benchmark_Q2_gradient(instances, "bench_Q2.csv");
+    // --- BENCHMARK Q1 ---
+    std::cout << "\n=========================================\n";
+    std::cout << "Lancement Benchmark Q1" << std::endl;
+    auto s1 = std::chrono::high_resolution_clock::now();
+    run_benchmark_Q1_discrete(instances, "../code/bench_Q1.csv");
+    auto e1 = std::chrono::high_resolution_clock::now();
+    t_q1 = std::chrono::duration<double>(e1 - s1).count(); // Temps en secondes
 
-    std::cout << "Benchmark Q3" << std::endl;
-    run_benchmark_Q3_weighted(instances, "bench_Q3.csv");
+    // --- BENCHMARK Q2 ---
+    std::cout << "\n=========================================\n";
+    std::cout << "Lancement Benchmark Q2" << std::endl;
+    auto s2 = std::chrono::high_resolution_clock::now();
+    run_benchmark_Q2_gradient(instances, "../code/bench_Q2.csv");
+    auto e2 = std::chrono::high_resolution_clock::now();
+    t_q2 = std::chrono::duration<double>(e2 - s2).count();
+
+    // --- BENCHMARK Q3 ---
+    std::cout << "\n=========================================\n";
+    std::cout << "Lancement Benchmark Q3" << std::endl;
+    auto s3 = std::chrono::high_resolution_clock::now();
+    run_benchmark_Q3_weighted(instances, "../code/bench_Q3.csv");
+    auto e3 = std::chrono::high_resolution_clock::now();
+    t_q3 = std::chrono::duration<double>(e3 - s3).count();
+
+    // --- BENCHMARK Q4 ---
+    std::cout << "\n=========================================\n";
+    std::cout << "Lancement Benchmark Q4 (Hybride)" << std::endl;
+    auto s4 = std::chrono::high_resolution_clock::now();
+    run_benchmark_Q4_hybrid(instances, "../code/bench_Q4.csv");
+    auto e4 = std::chrono::high_resolution_clock::now();
+    t_q4 = std::chrono::duration<double>(e4 - s4).count();
+
+
+    // --- AFFICHAGE DU TABLEAU RECAPITULATIF ---
+    std::cout << "\n\n";
+    std::cout << "====================================================\n";
+    std::cout << "             RESUME DES TEMPS D'EXECUTION           \n";
+    std::cout << "----------------------------------------------------\n";
+    std::cout << std::left << std::setw(25) << "Benchmark" << "| " << "Temps total (en secondes)\n";
+    std::cout << "----------------------------------------------------\n";
+    std::cout << std::left << std::setw(25) << "Q1 (Discret)" << "| " << t_q1 << " s\n";
+    std::cout << std::left << std::setw(25) << "Q2 (Gradient projete)" << "| " << t_q2 << " s\n";
+    std::cout << std::left << std::setw(25) << "Q3 (Pondere)" << "| " << t_q3 << " s\n";
+    std::cout << std::left << std::setw(25) << "Q4 (Hybride)" << "| " << t_q4 << " s\n";
+    std::cout << "====================================================\n";
 
     return 0;
 }
