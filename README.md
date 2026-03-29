@@ -45,15 +45,11 @@ Les résulats des différentes expérimentations sont stockées dans les fichier
 - Best_Static : Best Improvement Static
 - Best_Dynamic : Best Improvement Dynamic
 
-`bench_Q2.csv` : résultat des algorithmes non pondérés
-- FI : First Improvement
-- FI_SUMMARY : Temps d'exécution moyen
-- HC : Hill Climber
-- HC_SUMMARY : Temps d'exécution moyen
-- Best_Static : Best Improvement Static
-- Best_Dynamic : Best Improvement Dynamic
+`bench_Q2.csv` : résultat des algorithmes gradient projetés
+- adaptatif : alpha adaptatif
+- fixe : alpha fixe
 
-`bench_Q3.csv` : résultat des algorithmes non pondérés
+`bench_Q3.csv` : résultat des algorithmes pondérés
 - FI : First Improvement
 - FI_SUMMARY : Temps d'exécution moyen
 - HC : Hill Climber
