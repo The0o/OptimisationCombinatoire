@@ -951,3 +951,266 @@ void run_benchmark_Q4_hybrid(const std::vector<std::string>& instances, const st
     }
     csv.close();
 }
+
+// ============= QUESTION 5 =============
+
+// Local search MCP utilisant un timer externe (pour ne pas deborder le budget global ILS/VNS)
+static std::vector<vertex> hill_climbing_timed(const Graph* g, std::vector<vertex> clique,
+    std::chrono::high_resolution_clock::time_point t0, double limit_ms)
+{
+    bool improved = true;
+    while (improved && !is_timeout(t0, limit_ms)) {
+        improved = false;
+
+        // Etape 1 : ajout d'un sommet compatible
+        for (vertex v = 0; v < g->nb_vertices() && !is_timeout(t0, limit_ms); ++v) {
+            if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+            bool ok = true;
+            for (vertex u : clique) if (!g->is_edge(u, v)) { ok = false; break; }
+            if (ok) { clique.push_back(v); improved = true; break; }
+        }
+        if (improved) continue;
+
+        // Etape 2 : echange 1 contre 2
+        for (size_t i = 0; i < clique.size() && !is_timeout(t0, limit_ms); ++i) {
+            std::vector<vertex> cands;
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                bool ok = true;
+                for (size_t j = 0; j < clique.size(); ++j)
+                    if (i != j && !g->is_edge(clique[j], v)) { ok = false; break; }
+                if (ok) cands.push_back(v);
+            }
+            bool done = false;
+            for (size_t a = 0; a < cands.size() && !done; ++a)
+                for (size_t b = a + 1; b < cands.size() && !done; ++b)
+                    if (g->is_edge(cands[a], cands[b])) {
+                        clique.erase(clique.begin() + i);
+                        clique.push_back(cands[a]);
+                        clique.push_back(cands[b]);
+                        improved = true; done = true;
+                    }
+            if (done) break;
+        }
+    }
+    return clique;
+}
+
+// Local search WMCP utilisant un timer externe
+static std::vector<vertex> hill_climbing_weighted_timed(const Graph* g, std::vector<vertex> clique,
+    std::chrono::high_resolution_clock::time_point t0, double limit_ms)
+{
+    bool improved = true;
+    while (improved && !is_timeout(t0, limit_ms)) {
+        improved = false;
+
+        // Etape 1 : ajout simple
+        for (vertex v = 0; v < g->nb_vertices() && !is_timeout(t0, limit_ms); ++v) {
+            if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+            bool ok = true;
+            for (vertex u : clique) if (!g->is_edge(u, v)) { ok = false; break; }
+            if (ok) { clique.push_back(v); improved = true; break; }
+        }
+        if (improved) continue;
+
+        // Etape 2 : echange 1 contre 1 (si gain de poids)
+        for (size_t i = 0; i < clique.size() && !is_timeout(t0, limit_ms); ++i) {
+            double wu = getVertexWeight(*g, clique[i]);
+            bool done = false;
+            for (vertex v = 0; v < g->nb_vertices() && !done; ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                if (getVertexWeight(*g, v) <= wu) continue;
+                bool ok = true;
+                for (size_t j = 0; j < clique.size(); ++j)
+                    if (i != j && !g->is_edge(clique[j], v)) { ok = false; break; }
+                if (ok) {
+                    clique.erase(clique.begin() + i);
+                    clique.push_back(v);
+                    improved = true; done = true;
+                }
+            }
+            if (done) break;
+        }
+        if (improved) continue;
+
+        // Etape 3 : echange 1 contre 2 (si gain de poids)
+        for (size_t i = 0; i < clique.size() && !is_timeout(t0, limit_ms); ++i) {
+            double wu = getVertexWeight(*g, clique[i]);
+            std::vector<vertex> cands;
+            for (vertex v = 0; v < g->nb_vertices(); ++v) {
+                if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+                bool ok = true;
+                for (size_t j = 0; j < clique.size(); ++j)
+                    if (i != j && !g->is_edge(clique[j], v)) { ok = false; break; }
+                if (ok) cands.push_back(v);
+            }
+            bool done = false;
+            for (size_t a = 0; a < cands.size() && !done; ++a)
+                for (size_t b = a + 1; b < cands.size() && !done; ++b)
+                    if (g->is_edge(cands[a], cands[b]) &&
+                        (getVertexWeight(*g, cands[a]) + getVertexWeight(*g, cands[b]) > wu)) {
+                        clique.erase(clique.begin() + i);
+                        clique.push_back(cands[a]);
+                        clique.push_back(cands[b]);
+                        improved = true; done = true;
+                    }
+            if (done) break;
+        }
+    }
+    return clique;
+}
+
+// Extension glouton aleatoire : ajoute le maximum de sommets compatibles dans un ordre aleatoire
+static std::vector<vertex> greedy_extend_random(const Graph* g, std::vector<vertex> clique, std::mt19937& gen) {
+    std::vector<vertex> cands(g->nb_vertices());
+    std::iota(cands.begin(), cands.end(), 0);
+    std::shuffle(cands.begin(), cands.end(), gen);
+    for (vertex v : cands) {
+        if (std::find(clique.begin(), clique.end(), v) != clique.end()) continue;
+        bool ok = true;
+        for (vertex u : clique) if (!g->is_edge(u, v)) { ok = false; break; }
+        if (ok) clique.push_back(v);
+    }
+    return clique;
+}
+
+// Perturbation : retrait de k sommets aleatoires de la clique
+static void perturb_clique(std::vector<vertex>& clique, int k, std::mt19937& gen) {
+    int to_remove = std::min(k, (int)clique.size());
+    for (int i = 0; i < to_remove; ++i) {
+        std::uniform_int_distribution<int> d(0, (int)clique.size() - 1);
+        clique.erase(clique.begin() + d(gen));
+    }
+}
+
+// ILS pour MCP : perturbe un minimum local en retirant k sommets, puis relance la recherche locale
+std::vector<vertex> ils_mcp(const Graph* g, int k, int seed, double time_limit_ms) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(seed);
+
+    std::vector<vertex> best = descent_first_improvement(g, seed);
+    best = hill_climbing_timed(g, best, t0, time_limit_ms);
+
+    while (!is_timeout(t0, time_limit_ms)) {
+        auto current = best;
+        perturb_clique(current, k, gen);
+        current = greedy_extend_random(g, current, gen);
+        current = hill_climbing_timed(g, current, t0, time_limit_ms);
+        if (current.size() > best.size()) best = current;
+    }
+    return best;
+}
+
+// ILS pour WMCP
+std::vector<vertex> ils_wmcp(const Graph* g, int k, int seed, double time_limit_ms) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(seed);
+
+    std::vector<vertex> best = descent_first_improvement_weighted(g, seed);
+    best = hill_climbing_weighted_timed(g, best, t0, time_limit_ms);
+
+    while (!is_timeout(t0, time_limit_ms)) {
+        auto current = best;
+        perturb_clique(current, k, gen);
+        current = greedy_extend_random(g, current, gen);
+        current = hill_climbing_weighted_timed(g, current, t0, time_limit_ms);
+        if (clique_weight(g, current) > clique_weight(g, best)) best = current;
+    }
+    return best;
+}
+
+// VNS pour MCP : fait varier la taille de perturbation k de 1 a k_max
+// Quand une amelioration est trouvee, k revient a 1
+std::vector<vertex> vns_mcp(const Graph* g, int k_max, int seed, double time_limit_ms) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(seed);
+
+    std::vector<vertex> best = descent_first_improvement(g, seed);
+    best = hill_climbing_timed(g, best, t0, time_limit_ms);
+
+    int k = 1;
+    while (!is_timeout(t0, time_limit_ms)) {
+        auto current = best;
+        perturb_clique(current, k, gen);
+        current = greedy_extend_random(g, current, gen);
+        current = hill_climbing_timed(g, current, t0, time_limit_ms);
+
+        if (current.size() > best.size()) {
+            best = current;
+            k = 1;
+        } else {
+            k = (k < k_max) ? k + 1 : 1;
+        }
+    }
+    return best;
+}
+
+// VNS pour WMCP
+std::vector<vertex> vns_wmcp(const Graph* g, int k_max, int seed, double time_limit_ms) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    std::mt19937 gen(seed);
+
+    std::vector<vertex> best = descent_first_improvement_weighted(g, seed);
+    best = hill_climbing_weighted_timed(g, best, t0, time_limit_ms);
+
+    int k = 1;
+    while (!is_timeout(t0, time_limit_ms)) {
+        auto current = best;
+        perturb_clique(current, k, gen);
+        current = greedy_extend_random(g, current, gen);
+        current = hill_climbing_weighted_timed(g, current, t0, time_limit_ms);
+
+        if (clique_weight(g, current) > clique_weight(g, best)) {
+            best = current;
+            k = 1;
+        } else {
+            k = (k < k_max) ? k + 1 : 1;
+        }
+    }
+    return best;
+}
+
+void run_benchmark_Q5_local_search(const std::vector<std::string>& instances, const std::string& output_filename) {
+    std::ofstream csv(output_filename);
+    csv << "Instance;Probleme;Algorithme;Score;Temps_ms;Statut\n";
+
+    // Parametres a valider : taille de perturbation k pour ILS, k_max pour VNS
+    const std::vector<int> k_values = {1, 2, 3, 4};
+    const int k_max_vns = 5;
+    const double time_limit = 10000.0; // 10 secondes
+
+    for (const std::string& inst_name : instances) {
+        std::cout << "Lancement Benchmark Q5 INSTANCE: " << inst_name << std::endl;
+        std::string filename = inst_name;
+        GraphHeavy g(filename);
+
+        // --- MCP (non pondéré) ---
+        for (int k : k_values) {
+            auto s = std::chrono::high_resolution_clock::now();
+            auto c = ils_mcp(&g, k, 42, time_limit);
+            double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - s).count();
+            csv << inst_name << ";MCP;ILS_k" << k << ";" << c.size() << ";" << t << ";OK\n";
+        }
+        {
+            auto s = std::chrono::high_resolution_clock::now();
+            auto c = vns_mcp(&g, k_max_vns, 42, time_limit);
+            double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - s).count();
+            csv << inst_name << ";MCP;VNS_kmax" << k_max_vns << ";" << c.size() << ";" << t << ";OK\n";
+        }
+
+        // --- WMCP (pondéré) ---
+        for (int k : k_values) {
+            auto s = std::chrono::high_resolution_clock::now();
+            auto c = ils_wmcp(&g, k, 42, time_limit);
+            double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - s).count();
+            csv << inst_name << ";WMCP;ILS_k" << k << ";" << clique_weight(&g, c) << ";" << t << ";OK\n";
+        }
+        {
+            auto s = std::chrono::high_resolution_clock::now();
+            auto c = vns_wmcp(&g, k_max_vns, 42, time_limit);
+            double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - s).count();
+            csv << inst_name << ";WMCP;VNS_kmax" << k_max_vns << ";" << clique_weight(&g, c) << ";" << t << ";OK\n";
+        }
+    }
+    csv.close();
+}

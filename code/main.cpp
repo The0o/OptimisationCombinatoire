@@ -43,7 +43,7 @@ int main(int argc , char* argv [])
         "san/sanr200_0.9.clq", "san/sanr400_0.5.clq", "san/sanr400_0.7.clq"
     };
 
-    double t_q1 = 0, t_q2 = 0, t_q3 = 0, t_q4 = 0;
+    double t_q1 = 0, t_q2 = 0, t_q3 = 0, t_q4 = 0, t_q5 = 0;
 
     // --- BENCHMARK Q1 ---
     std::cout << "\n=========================================\n";
@@ -78,6 +78,14 @@ int main(int argc , char* argv [])
     t_q4 = std::chrono::duration<double>(e4 - s4).count();
 
 
+    // --- BENCHMARK Q5 ---
+    std::cout << "\n=========================================\n";
+    std::cout << "Lancement Benchmark Q5 (Recherche Locale ILS/VNS)" << std::endl;
+    auto s5 = std::chrono::high_resolution_clock::now();
+    run_benchmark_Q5_local_search(instances, "../code/bench_Q5.csv");
+    auto e5 = std::chrono::high_resolution_clock::now();
+    t_q5 = std::chrono::duration<double>(e5 - s5).count();
+
     // --- AFFICHAGE DU TABLEAU RECAPITULATIF ---
     std::cout << "\n\n";
     std::cout << "====================================================\n";
@@ -89,6 +97,7 @@ int main(int argc , char* argv [])
     std::cout << std::left << std::setw(25) << "Q2 (Gradient projete)" << "| " << t_q2 << " s\n";
     std::cout << std::left << std::setw(25) << "Q3 (Pondere)" << "| " << t_q3 << " s\n";
     std::cout << std::left << std::setw(25) << "Q4 (Hybride)" << "| " << t_q4 << " s\n";
+    std::cout << std::left << std::setw(25) << "Q5 (ILS/VNS)" << "| " << t_q5 << " s\n";
     std::cout << "====================================================\n";
 
     return 0;
